@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Smart Switch</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f4f4f9;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            margin: 0;
+        }
+
+        h1 {
+            color: #333;
+        }
+
+        .switch-container {
+            margin: 20px;
+            display: flex;
+            gap: 20px;
+        }
+
+        .switch-wrapper {
+            text-align: center;
+        }
+
+        .switch-btn {
+            padding: 20px 40px;
+            font-size: 24px;
+            border: none;
+            border-radius: 50px;
+            cursor: pointer;
+            transition: background-color 0.3s, transform 0.1s;
+            color: white;
+            font-weight: bold;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+
+        .switch-btn.on {
+            background-color: #4CAF50;
+            /* Green */
+        }
+
+        .switch-btn.off {
+            background-color: #f44336;
+            /* Red */
+        }
+
+        .switch-btn:active {
+            transform: scale(0.95);
+        }
+
+        .history-container {
+            margin-top: 30px;
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            width: 300px;
+        }
+
+        .history-container h2 {
+            margin-top: 0;
+            font-size: 18px;
+            color: #555;
+        }
+
+        ul {
+            list-style-type: none;
+            padding: 0;
+        }
+
+        li {
+            border-bottom: 1px solid #eee;
+            padding: 8px 0;
+            font-size: 14px;
+            display: flex;
+            justify-content: space-between;
+        }
+
+        li:last-child {
+            border-bottom: none;
+        }
+
+        .status-indicator {
+            font-weight: bold;
+        }
+    </style>
+</head>
+
+<body>
+
+    <h1>Smart Switch Control</h1>
+
+    <div class="switch-container">
+        <div class="switch-wrapper">
+            <h3>Switch 1</h3>
+            <button id="btn1" class="switch-btn off" onclick="toggleSwitch(1)">OFF</button>
+        </div>
+        <div class="switch-wrapper">
+            <h3>Switch 2</h3>
+            <button id="btn2" class="switch-btn off" onclick="toggleSwitch(2)">OFF</button>
+        </div>
+    </div>
+
+    <div class="history-container">
+        <h2>Recent Activity</h2>
+        <ul id="historyList">
+            <li>Loading...</li>
+        </ul>
+    </div>
+
+    <script>
+        const btn1 = document.getElementById('btn1');
+        const btn2 = document.getElementById('btn2');
+        const historyList = document.getElementById('historyList');
+
+        // Fetch initial state
+        async function updateState() {
+            try {
+                const res = await fetch('/api/status');
+                if (!res.ok) throw new Error(`Server Error: ${res.status}`);
+                const data = await res.json();
+                renderButton(btn1, data.switch1);
+                renderButton(btn2, data.switch2);
+                updateHistory();
+            } catch (err) {
+                console.error("Error fetching status:", err);
+            }
+        }
+
+        function renderButton(btn, isOn) {
+            if (isOn) {
+                btn.textContent = "ON";
+                btn.classList.remove('off');
+                btn.classList.add('on');
+            } else {
+                btn.textContent = "OFF";
+                btn.classList.remove('on');
+                btn.classList.add('off');
+            }
+        }
+
+        async function toggleSwitch(id) {
+            try {
+                const res = await fetch('/api/toggle', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ id: id })
+                });
+                const data = await res.json();
+                renderButton(btn1, data.state.switch1);
+                renderButton(btn2, data.state.switch2);
+                updateHistory();
+            } catch (err) {
+                console.error("Error toggling:", err);
+            }
+        }
+
+        async function updateHistory() {
+            try {
+                const res = await fetch('/api/history');
+                if (!res.ok) throw new Error(`Server Error: ${res.status}`);
+                const data = await res.json();
+
+                historyList.innerHTML = '';
+                if (data.history.length === 0) {
+                    historyList.innerHTML = '<li>No history yet</li>';
+                    return;
+                }
+
+                data.history.forEach(item => {
+                    const li = document.createElement('li');
+                    try {
+                        let dateStr = "Invalid Date";
+                        if (item.timestamp) {
+                            const utcString = item.timestamp.replace(' ', 'T') + 'Z';
+                            dateStr = new Date(utcString).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+                        }
+                        li.innerHTML = `<span>${dateStr}</span> <span class="status-indicator">${item.action}</span>`;
+                    } catch (e) {
+                        li.innerHTML = `<span>Error parsing date</span> <span class="status-indicator">${item.action}</span>`;
+                    }
+                    historyList.appendChild(li);
+                });
+            } catch (err) {
+                console.error("Error fetching history:", err);
+                historyList.innerHTML = `<li style="color:red">Error: ${err.message}</li>`;
+            }
+        }
+
+        // Poll every 2 seconds
+        setInterval(updateState, 2000);
+
+        // Initial load
+        updateState();
+    </script>
+
+</body>
+
+</html>
