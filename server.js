@@ -2,6 +2,7 @@ const express = require('express');
 const sqlite3 = require('sqlite3').verbose();
 const cors = require('cors');
 const path = require('path');
+const fs = require('fs');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -69,6 +70,24 @@ app.get('/api/history', (req, res) => {
             return;
         }
         res.json({ history: rows });
+    });
+});
+
+// API: Get Firmware Version
+app.get('/api/firmware/version', (req, res) => {
+    const versionPath = path.join(__dirname, 'public', 'firmware', 'version.json');
+    fs.readFile(versionPath, 'utf8', (err, data) => {
+        if (err) {
+            console.error('Error reading version file:', err);
+            return res.json({ version: 0 });
+        }
+        try {
+            const versionData = JSON.parse(data);
+            res.json(versionData);
+        } catch (e) {
+            console.error('Error parsing version file:', e);
+            res.json({ version: 0 });
+        }
     });
 });
 
